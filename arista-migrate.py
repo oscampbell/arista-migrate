@@ -6,8 +6,6 @@ Extracts everything needed to migrate an interface from one Arista router
 to another: VRFs, VLANs, ACLs, prefix-lists, route-maps, static routes,
 and BGP VRF stanzas — all pulled from the source router's running-config.
 
-No LLM required — pure deterministic dependency-graph traversal.
-
 Usage:
     python3 arista-migrate.py -t <target> -s <source> [options]
 
