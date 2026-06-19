@@ -5,6 +5,7 @@ from typing import List, Optional, Set, Dict
 class IPAddress:
     address: str
     mask: str # e.g. "24" or "255.255.255.0"
+    secondary: bool = False
 
 @dataclass
 class InterfaceIR:
@@ -21,6 +22,8 @@ class InterfaceIR:
     switchport_access_vlan: Optional[str] = None
     switchport_trunk_vlans: List[str] = field(default_factory=list)
     mtu: Optional[int] = None
+    speed: Optional[str] = None
+    load_interval: Optional[int] = None
     raw_lines: List[str] = field(default_factory=list)
 
 @dataclass

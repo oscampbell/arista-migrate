@@ -75,14 +75,25 @@ class AristaGenerator(BaseGenerator):
                 out.append(f"interface {iface.name}")
                 if iface.description:
                     out.append(f"   description {iface.description}")
+                if iface.load_interval:
+                    out.append(f"   load-interval {iface.load_interval}")
+                if iface.mtu:
+                    out.append(f"   mtu {iface.mtu}")
+                if iface.speed:
+                    out.append(f"   speed {iface.speed}")
+                    
                 if not iface.enabled:
                     out.append("   shutdown")
                 else:
                     out.append("   no shutdown")
+                    
+                if iface.vlan:
+                    out.append(f"   encapsulation dot1q vlan {iface.vlan}")
                 if iface.vrf:
                     out.append(f"   vrf {iface.vrf}")
                 for ip in iface.ip_addresses:
-                    out.append(f"   ip address {ip.address}/{ip.mask}")
+                    sec = " secondary" if ip.secondary else ""
+                    out.append(f"   ip address {ip.address}/{ip.mask}{sec}")
                 if iface.acl_in:
                     out.append(f"   ip access-group {iface.acl_in} in")
                 if iface.acl_out:
@@ -107,10 +118,8 @@ class AristaGenerator(BaseGenerator):
             out.append("! SECTION: STATIC ROUTES")
             out.append("!" + "-" * 68)
             for sr in migration_ir.static_routes:
-                # Basic best effort
-                # e.g., MLX "ip route vrf NAME 10.0.0.0/8 1.2.3.4"
-                # Arista is identical usually: "ip route vrf NAME 10.0.0.0/8 1.2.3.4"
-                out.append(sr.raw_line)
+                vrf_str = f"vrf {sr.vrf} " if sr.vrf else ""
+                out.append(f"ip route {vrf_str}{sr.prefix} {sr.next_hop}")
             out.append("!")
             out.append("")
 
@@ -129,13 +138,18 @@ class AristaGenerator(BaseGenerator):
                 out.append("   !")
             out.append("")
 
-        # Route Maps & Prefix Lists
+
+
+        # Prefix Lists & Route Maps
         if migration_ir.prefix_lists:
             out.append("! SECTION: PREFIX LISTS")
             out.append("!" + "-" * 68)
             for pl in migration_ir.prefix_lists:
                 for rule in pl.rules:
-                    out.append(rule.raw_line)
+                    seq_str = f" seq {rule.seq}" if rule.seq else ""
+                    ge_str = f" ge {rule.ge}" if rule.ge else ""
+                    le_str = f" le {rule.le}" if rule.le else ""
+                    out.append(f"ip prefix-list {pl.name}{seq_str} {rule.action} {rule.prefix}{ge_str}{le_str}")
             out.append("!")
             out.append("")
 

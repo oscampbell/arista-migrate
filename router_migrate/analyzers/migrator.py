@@ -17,7 +17,12 @@ class Migrator:
         needed_ips: List[IPAddress] = []
 
         # 1. Interfaces
-        for iface_name, iface in self.target_snippet.interfaces.items():
+        for iface_name in self.target_snippet.interfaces.keys():
+            iface = self.source_device.interfaces.get(iface_name)
+            if not iface:
+                self.migration_ir.warnings.append(f"Interface {iface_name} not found in source config")
+                continue
+                
             # If we rename, change the name in the IR
             new_name = self.renames.get(iface_name, iface_name)
             migrated_iface = InterfaceIR(
@@ -34,6 +39,8 @@ class Migrator:
                 switchport_access_vlan=iface.switchport_access_vlan,
                 switchport_trunk_vlans=iface.switchport_trunk_vlans,
                 mtu=iface.mtu,
+                speed=iface.speed,
+                load_interval=iface.load_interval,
                 raw_lines=iface.raw_lines
             )
             self.migration_ir.interfaces.append(migrated_iface)

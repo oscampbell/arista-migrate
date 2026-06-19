@@ -1,7 +1,7 @@
 import re
 from typing import List, Dict
 from router_migrate.parsers.base import BaseParser
-from router_migrate.models import DeviceIR, InterfaceIR, VrfIR, VlanIR, AclIR, AclRuleIR, BgpVrfIR, BgpNeighborIR, StaticRouteIR, RouteMapIR, RouteMapRuleIR, IPAddress
+from router_migrate.models import DeviceIR, InterfaceIR, VrfIR, VlanIR, AclIR, AclRuleIR, BgpVrfIR, BgpNeighborIR, StaticRouteIR, RouteMapIR, RouteMapRuleIR, IPAddress, PrefixListIR, PrefixListRuleIR
 
 class AristaParser(BaseParser):
     def _split_blocks(self, text: str) -> List[List[str]]:
@@ -98,14 +98,21 @@ class AristaParser(BaseParser):
                         iface.description = line.replace("description", "").strip()
                     elif line.startswith("vrf"):
                         iface.vrf = line.replace("vrf", "").strip()
+                    elif line.startswith("mtu"):
+                        iface.mtu = int(line.split()[1])
+                    elif line.startswith("speed"):
+                        iface.speed = line.replace("speed", "").strip()
+                    elif line.startswith("load-interval"):
+                        iface.load_interval = int(line.split()[1])
                     elif line.startswith("ip address"):
                         parts = line.split()
+                        sec = "secondary" in parts
                         if len(parts) >= 3:
                             if "/" in parts[2]:
                                 addr, mask = parts[2].split("/")
-                                iface.ip_addresses.append(IPAddress(address=addr, mask=mask))
+                                iface.ip_addresses.append(IPAddress(address=addr, mask=mask, secondary=sec))
                             elif len(parts) >= 4:
-                                iface.ip_addresses.append(IPAddress(address=parts[2], mask=parts[3]))
+                                iface.ip_addresses.append(IPAddress(address=parts[2], mask=parts[3], secondary=sec))
                     elif line.startswith("ip access-group"):
                         parts = line.split()
                         if len(parts) >= 4:
@@ -184,6 +191,15 @@ class AristaParser(BaseParser):
                                             ir.bgp_vrfs[current_vrf].neighbors[ip].route_map_in = rm_name
                                         elif direction == "out":
                                             ir.bgp_vrfs[current_vrf].neighbors[ip].route_map_out = rm_name
+                                if "prefix-list" in line:
+                                    pl_index = parts.index("prefix-list")
+                                    if len(parts) > pl_index + 2:
+                                        direction = parts[pl_index + 2]
+                                        pl_name = parts[pl_index + 1]
+                                        if direction == "in":
+                                            ir.bgp_vrfs[current_vrf].neighbors[ip].prefix_list_in = pl_name
+                                        elif direction == "out":
+                                            ir.bgp_vrfs[current_vrf].neighbors[ip].prefix_list_out = pl_name
 
             # Route Map
             elif header.startswith("route-map"):
@@ -204,11 +220,58 @@ class AristaParser(BaseParser):
                     ir.route_maps[name].rules.append(rm_rule)
                     ir.route_maps[name].raw_lines.extend(block)
         
+            # Prefix List
+            elif header.startswith("ip prefix-list"):
+                for line in block:
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        name = parts[2]
+                        if name not in ir.prefix_lists:
+                            ir.prefix_lists[name] = PrefixListIR(name=name, raw_lines=[])
+                        
+                        rule = PrefixListRuleIR(action="permit", prefix="0.0.0.0/0", raw_line=line)
+                        if "seq" in parts:
+                            seq_idx = parts.index("seq")
+                            rule.seq = int(parts[seq_idx + 1])
+                        
+                        if "permit" in parts:
+                            rule.action = "permit"
+                            p_idx = parts.index("permit")
+                            rule.prefix = parts[p_idx + 1]
+                        elif "deny" in parts:
+                            rule.action = "deny"
+                            d_idx = parts.index("deny")
+                            rule.prefix = parts[d_idx + 1]
+                            
+                        if "le" in parts:
+                            le_idx = parts.index("le")
+                            rule.le = int(parts[le_idx + 1])
+                        if "ge" in parts:
+                            ge_idx = parts.index("ge")
+                            rule.ge = int(parts[ge_idx + 1])
+                            
+                        ir.prefix_lists[name].rules.append(rule)
+                        ir.prefix_lists[name].raw_lines.append(line)
+
         # Static Routes
         for line in config_text.splitlines():
             line = line.strip()
             if line.startswith("ip route "):
-                ir.static_routes.append(StaticRouteIR(prefix="", next_hop="", raw_line=line))
+                parts = line.split()
+                sr = StaticRouteIR(prefix="", next_hop="", raw_line=line)
+                
+                # ip route vrf CDCN 0.0.0.0/0 10.32.2.146
+                # ip route 193.203.70.160/29 193.203.70.98
+                if "vrf" in parts:
+                    v_idx = parts.index("vrf")
+                    sr.vrf = parts[v_idx + 1]
+                    sr.prefix = parts[v_idx + 2]
+                    sr.next_hop = parts[v_idx + 3] if len(parts) > v_idx + 3 else ""
+                else:
+                    sr.prefix = parts[2]
+                    sr.next_hop = parts[3] if len(parts) > 3 else ""
+                    
+                ir.static_routes.append(sr)
 
         return ir
 
