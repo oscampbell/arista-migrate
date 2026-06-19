@@ -14,9 +14,9 @@ import argparse
 import sys
 import re
 from router_migrate.parsers.mlx import MlxParser
-# from router_migrate.parsers.arista import AristaParser
+from router_migrate.parsers.arista import AristaParser
 from router_migrate.generators.arista import AristaGenerator
-# from router_migrate.generators.mlx import MlxGenerator
+from router_migrate.generators.mlx import MlxGenerator
 from router_migrate.analyzers.migrator import Migrator
 
 def main():
@@ -60,9 +60,7 @@ def main():
     if args.source_vendor == "mlx":
         parser_obj = MlxParser()
     else:
-        # parser_obj = AristaParser()
-        print("Arista source parser not fully implemented yet.")
-        sys.exit(1)
+        parser_obj = AristaParser()
 
     source_device = parser_obj.parse(fullconfig_text)
     target_snippet = parser_obj.parse_snippet(target_text)
@@ -75,9 +73,7 @@ def main():
     if args.target_vendor == "arista":
         generator = AristaGenerator()
     else:
-        # generator = MlxGenerator()
-        print("MLX target generator not fully implemented yet.")
-        sys.exit(1)
+        generator = MlxGenerator()
 
     output_text = generator.generate(migration_ir)
 
