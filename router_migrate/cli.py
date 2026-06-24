@@ -12,6 +12,8 @@ Usage:
 
 import argparse
 import sys
+import os
+import logging
 from router_migrate import __version__
 from router_migrate.parsers.mlx import MlxParser
 from router_migrate.parsers.arista import AristaParser
@@ -42,13 +44,22 @@ def main():
                         help="Target vendor to migrate to")
     parser.add_argument("-o", "--output", default=None,
                         help="Output file (default: stdout)")
+    parser.add_argument("-f", "--force", action="store_true",
+                        help="Force overwrite if output file already exists")
     parser.add_argument("--new-interface", action="append", default=[],
                         metavar="OLD=NEW",
                         help="Interface rename on new device, e.g. --new-interface ethernet 1/1=Ethernet5")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Enable verbose logging")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}",
                         help="Show the version of the tool")
 
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+    else:
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     try:
         if args.target == "-":
@@ -118,6 +129,8 @@ def main():
 
     # Output
     if args.output:
+        if os.path.exists(args.output) and not args.force:
+            sys.exit(f"[error] Output file '{args.output}' already exists. Use -f or --force to overwrite.")
         with open(args.output, "w") as f:
             f.write(output_text)
         print(f"Output written to: {args.output}")
