@@ -1309,6 +1309,33 @@ pre {
 .freshness-dot.stale  { background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.5); }
 .freshness-dot.old    { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.5); }
 
+/* Interface chips */
+.history-ifaces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0 1.5rem 0.85rem;
+}
+
+.history-iface-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.18rem 0.5rem;
+    color: var(--primary);
+    white-space: nowrap;
+    transition: background 0.2s ease;
+}
+
+.history-iface-more {
+    color: var(--text-muted);
+    background: transparent;
+    border-style: dashed;
+}
+
+
 /* ============================================================
    SAVE SOURCE DIALOG
    ============================================================ */

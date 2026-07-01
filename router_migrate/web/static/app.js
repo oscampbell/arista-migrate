@@ -107,6 +107,41 @@ function formatDate(iso) {
 
 const VENDOR_LABELS = { mlx: 'MLX', arista: 'Arista', cisco: 'Cisco', juniper: 'Juniper', brocade: 'Brocade', huawei: 'Huawei', panos: 'PAN-OS' };
 
+// ─── INTERFACE EXTRACTION ────────────────────────────────────────────────────
+function extractInterfaces(config, vendor) {
+    if (!config) return [];
+    const ifaces = new Set();
+    if (vendor === 'juniper') {
+        // set interfaces ge-0/0/0 { ... } or set interfaces ae0 ...
+        for (const m of config.matchAll(/^set interfaces (\S+)/gm)) {
+            if (m[1] && !m[1].startsWith('[')) ifaces.add(m[1]);
+        }
+    } else if (vendor === 'panos') {
+        for (const m of config.matchAll(/name="([^"]+)"/g)) ifaces.add(m[1]);
+    } else {
+        // Cisco, Arista, Huawei, Brocade, MLX — all use "interface <name>"
+        for (const m of config.matchAll(/^interface\s+(.+)/gim)) {
+            ifaces.add(m[1].trim());
+        }
+    }
+    return [...ifaces];
+}
+
+function ifaceChipsHTML(ifaces) {
+    if (!ifaces || ifaces.length === 0) return '';
+    const MAX = 6;
+    const shown = ifaces.slice(0, MAX);
+    const extra = ifaces.length - MAX;
+    return '<div class="history-ifaces">' +
+        shown.map(i => '<span class="history-iface-chip">' + escapeHtml(i) + '</span>').join('') +
+        (extra > 0 ? '<span class="history-iface-chip history-iface-more">+' + extra + ' more</span>' : '') +
+    '</div>';
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // ─── THEME FUNCTIONS ─────────────────────────────────────────────────────────
 function applyTheme(themeId) {
     document.body.className = document.body.className
@@ -172,12 +207,13 @@ function buildHistoryContent() {
             const fc = freshnessClass(entry.savedAt);
             const srcLabel = VENDOR_LABELS[entry.sourceVendor] || entry.sourceVendor;
             const tgtLabel = VENDOR_LABELS[entry.targetVendor] || entry.targetVendor;
+            const ifaces   = extractInterfaces(entry.sourceConfig, entry.sourceVendor);
             return '<div class="history-entry" data-id="' + entry.id + '">' +
                 '<div class="history-entry-main">' +
                     '<div class="history-entry-left">' +
                         '<span class="freshness-dot ' + fc + '" title="' + (fc === 'fresh' ? 'Fresh (< 7 days)' : fc === 'stale' ? 'Getting old (< 30 days)' : 'Old (30+ days)') + '"></span>' +
                         '<div>' +
-                            '<div class="history-hostname">' + (entry.hostname || '<span class="history-no-hostname">unknown host</span>') + '</div>' +
+                            '<div class="history-hostname">' + escapeHtml(entry.hostname || '') + (entry.hostname ? '' : '<span class="history-no-hostname">unknown host</span>') + '</div>' +
                             '<div class="history-vendors">' + srcLabel + ' <span class="history-arrow">&#x2192;</span> ' + tgtLabel + '</div>' +
                         '</div>' +
                     '</div>' +
@@ -189,6 +225,7 @@ function buildHistoryContent() {
                         '</div>' +
                     '</div>' +
                 '</div>' +
+                ifaceChipsHTML(ifaces) +
             '</div>';
         }).join('');
     } else {
@@ -200,12 +237,13 @@ function buildHistoryContent() {
         container.innerHTML = sources.map(src => {
             const fc = freshnessClass(src.savedAt);
             const vendorLabel = VENDOR_LABELS[src.vendor] || src.vendor;
+            const ifaces = extractInterfaces(src.config, src.vendor);
             return '<div class="history-entry" data-id="' + src.id + '">' +
                 '<div class="history-entry-main">' +
                     '<div class="history-entry-left">' +
                         '<span class="freshness-dot ' + fc + '" title="' + (fc === 'fresh' ? 'Fresh (< 7 days)' : fc === 'stale' ? 'Getting old (< 30 days)' : 'Old (30+ days)') + '"></span>' +
                         '<div>' +
-                            '<div class="history-hostname">' + (src.hostname || '<span class="history-no-hostname">unknown host</span>') + '</div>' +
+                            '<div class="history-hostname">' + escapeHtml(src.hostname || '') + (src.hostname ? '' : '<span class="history-no-hostname">unknown host</span>') + '</div>' +
                             '<div class="history-vendors">' + vendorLabel + '</div>' +
                         '</div>' +
                     '</div>' +
@@ -217,6 +255,7 @@ function buildHistoryContent() {
                         '</div>' +
                     '</div>' +
                 '</div>' +
+                ifaceChipsHTML(ifaces) +
             '</div>';
         }).join('');
     }
